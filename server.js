@@ -20,11 +20,15 @@ function loadDB() {
 }
 function saveDB(db) { fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf8'); }
 function loadKeys() {
+  // مفاتيح ثابتة عبر متغير البيئة (ضروري لأن قرص Render المجاني مؤقت)
+  if (process.env.LICENSE_KEYS_JSON) {
+    try { return JSON.parse(process.env.LICENSE_KEYS_JSON); } catch {}
+  }
   try { return JSON.parse(fs.readFileSync(KEYS_FILE, 'utf8')); }
   catch {
     const { publicKey, privateKey } = crypto.generateKeyPairSync('ec', { namedCurve: 'P-256', publicKeyEncoding: { type: 'spki', format: 'pem' }, privateKeyEncoding: { type: 'pkcs8', format: 'pem' } });
     const keys = { publicKey, privateKey, createdAt: new Date().toISOString() };
-    fs.writeFileSync(KEYS_FILE, JSON.stringify(keys, null, 2), 'utf8');
+    try { fs.writeFileSync(KEYS_FILE, JSON.stringify(keys, null, 2), 'utf8'); } catch {}
     return keys;
   }
 }
@@ -134,8 +138,17 @@ const server = http.createServer(async (req, res) => {
       saveDB(db);
       return send(res, 200, { ok: true });
     }
-    if (req.method === 'DELETE' && url.pathname === '/api/admin/device') {
-      const { code, deviceId } = await readBody(req);
+    if (req.method === 'GET' && url.pathname === '/api/admin/export') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Disposition': 'attachment; filename="astadhi-licenses-backup.json"', 'Access-Control-Allow-Origin': '*' });
+      return res.end(JSON.stringify(loadDB(), null, 2));
+    }
+    if (req.method === 'POST' && url.pathname === '/api/admin/import') {
+      const body = await readBody(req);
+      if (!body || typeof body !== 'object' || !body.licenses || typeof body.licenses !== 'object') return send(res, 400, { ok: false, message: 'ملف غير صالح' });
+      saveDB({ licenses: body.licenses });
+      return send(res, 200, { ok: true });
+    }
+    if (req.method === 'DELETE' && url.pathname === '/api/admin/device') {      const { code, deviceId } = await readBody(req);
       const lic = db.licenses[normCode(code)];
       if (!lic) return send(res, 404, { ok: false });
       if (lic.devices) delete lic.devices[String(deviceId)];
