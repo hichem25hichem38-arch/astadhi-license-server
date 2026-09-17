@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>لوحة تراخيص أستاذي</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Tahoma,Arial;background:#f4f7fb;color:#14263d;padding:20px}
+.wrap{max-width:900px;margin:0 auto}
+.card{background:#fff;border:1px solid #d8e8f3;border-radius:16px;padding:18px;margin-bottom:14px}
+h1{font-size:20px}h2{font-size:16px;margin:0 0 10px}
+label{display:block;font-size:13px;font-weight:700;margin-bottom:8px}
+input,select{width:100%;border:1px solid #d4e6f0;border-radius:10px;padding:10px;font:inherit;margin-top:4px}
+button{border:0;border-radius:10px;background:#1683c5;color:#fff;padding:10px 18px;font-weight:800;cursor:pointer}
+button.danger{background:#c0392b}button.ghost{background:#fff;color:#0b5f99;border:1px solid #cfe4f0}
+.row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
+th,td{border:1px solid #d8e8f3;padding:8px;text-align:center}
+th{background:#f2f9fd}
+code{direction:ltr;display:inline-block;background:#eef4f8;border-radius:6px;padding:2px 8px;font-size:12px}
+.warn{background:#fff8e6;border:1px solid #f0d48a;border-radius:10px;padding:10px;font-size:13px;margin-bottom:12px}
+pre{direction:ltr;text-align:left;background:#10243b;color:#d9e6f4;border-radius:10px;padding:12px;font-size:11px;overflow:auto}
+@media(max-width:700px){.row{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>🔑 لوحة تراخيص أستاذي</h1>
+<div class="card" id="loginCard">
+<h2>الدخول</h2>
+<label>رمز الإدارة (ADMIN_PASSWORD)<input id="token" type="password" placeholder="أدخل رمز الإدارة"></label>
+<button onclick="login()">دخول</button>
+</div>
+<div id="panel" style="display:none">
+<div class="card">
+<h2>＋ رمز جديد لعميل</h2>
+<div class="row">
+<label>اسم العميل<input id="cName" placeholder="مثال: متوسطة النور"></label>
+<label>المدة بالأيام<input id="cDays" type="number" value="365" min="1"></label>
+<label>عدد الأجهزة<input id="cDev" type="number" value="1" min="1"></label>
+</div>
+<p><button onclick="create()">توليد الرمز</button></p>
+<div id="newCode"></div>
+</div>
+<div class="card">
+<h2>الرموز الحالية <button class="ghost" onclick="load()">↻ تحديث</button></h2>
+<div id="list"></div>
+</div>
+<div class="card">
+<h2>المفتاح العام (يُضمَّن في التطبيقات)</h2>
+<pre id="pubkey"></pre>
+<p style="font-size:12px">انسخ قيمة <code>PUBLIC_KEY</code> في ملف <code>license-client.js</code> ثم أعد بناء التطبيقين.</p>
+</div>
+</div>
+</div>
+<script>
+let TOKEN = '';
+async function api(path, method = 'GET', body) {
+  const r = await fetch(path, { method, headers: { 'Content-Type': 'application/json', 'X-Admin-Token': TOKEN }, body: body ? JSON.stringify(body) : undefined });
+  return r.json();
+}
+async function login() {
+  TOKEN = document.getElementById('token').value;
+  const r = await api('/api/admin/licenses');
+  if (!r.ok) { alert('رمز الإدارة غير صحيح'); return; }
+  document.getElementById('loginCard').style.display = 'none';
+  document.getElementById('panel').style.display = 'block';
+  render(r);
+}
+async function load() { render(await api('/api/admin/licenses')); }
+function render(r) {
+  if (!r.ok) { alert('خطأ'); return; }
+  document.getElementById('pubkey').textContent = r.pubkey;
+  document.getElementById('list').innerHTML = '<table><thead><tr><th>الرمز</th><th>العميل</th><th>ينتهي</th><th>الأجهزة</th><th>الحالة</th><th>عمليات</th></tr></thead><tbody>' + r.licenses.map(l =>
+    `<tr><td><code>${l.code}</code></td><td>${l.clientName}</td><td>${l.expiry.slice(0, 10)}</td><td>${l.devices.length}/${l.maxDevices}<br><small>${l.devices.map(d => d.id.slice(0, 8) + '…').join('<br>')}</small></td><td>${l.revoked ? 'ملغى' : (new Date(l.expiry) < new Date() ? 'منتهي' : 'فعّال')}</td><td><button class="danger" onclick="revoke('${l.code}',${l.revoked ? 'false' : 'true'})">${l.revoked ? 'تفعيل' : 'إلغاء'}</button></td></tr>`
+  ).join('') + '</tbody></table>';
+}
+async function create() {
+  const r = await api('/api/admin/licenses', 'POST', { clientName: document.getElementById('cName').value, days: document.getElementById('cDays').value, maxDevices: document.getElementById('cDev').value });
+  if (r.ok) { document.getElementById('newCode').innerHTML = `<div class="warn">أرسل هذا الرمز للعميل: <code>${r.license.code}</code> — ينتهي ${r.license.expiry.slice(0, 10)} — ${r.license.maxDevices} جهاز</div>`; load(); }
+}
+async function revoke(code, val) { await api('/api/admin/revoke', 'POST', { code, revoked: val !== false }); load(); }
+</script>
+</body>
+</html>

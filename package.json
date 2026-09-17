@@ -1,0 +1,10 @@
+{
+  "name": "astadhi-license-server",
+  "version": "1.0.0",
+  "description": "خادم تراخيص أستاذي — رموز تفعيل مرتبطة بالأجهزة (بدون اعتماديات)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "license": "MIT"
+}
