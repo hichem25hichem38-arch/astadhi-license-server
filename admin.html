@@ -43,7 +43,7 @@ pre{direction:ltr;text-align:left;background:#10243b;color:#d9e6f4;border-radius
 <div id="newCode"></div>
 </div>
 <div class="card">
-<h2>الرموز الحالية <button class="ghost" onclick="load()">↻ تحديث</button></h2>
+<h2>الرموز الحالية <button class="ghost" onclick="load()">↻ تحديث</button> <button class="ghost" onclick="doExport()">⇩ نسخة احتياطية</button> <label class="ghost" style="cursor:pointer;padding:10px 18px">⇧ استرجاع<input id="impFile" type="file" accept=".json" hidden onchange="doImport(this.files[0])"></label></h2>
 <div id="list"></div>
 </div>
 <div class="card">
@@ -80,6 +80,16 @@ async function create() {
   if (r.ok) { document.getElementById('newCode').innerHTML = `<div class="warn">أرسل هذا الرمز للعميل: <code>${r.license.code}</code> — ينتهي ${r.license.expiry.slice(0, 10)} — ${r.license.maxDevices} جهاز</div>`; load(); }
 }
 async function revoke(code, val) { await api('/api/admin/revoke', 'POST', { code, revoked: val !== false }); load(); }
+async function doExport() {
+  const r = await fetch('/api/admin/export', { headers: { 'X-Admin-Token': TOKEN } });
+  const blob = await r.blob();
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'astadhi-licenses-backup.json'; a.click();
+}
+async function doImport(file) {
+  if (!file || !confirm('سيُستبدل سجل الرموز الحالي بالملف. متابعة؟')) return;
+  try { await api('/api/admin/import', 'POST', JSON.parse(await file.text())); alert('تم الاسترجاع'); load(); }
+  catch { alert('ملف غير صالح'); }
+}
 </script>
 </body>
 </html>
